@@ -1,7 +1,7 @@
 /*
     irmplircd -- zeroconf LIRC daemon that reads IRMP events from the USB IR Remote Receiver
 	             http://www.mikrocontroller.net/articles/USB_IR_Remote_Receiver
-    Copyright (C) 2011  Dirk E. Wagner
+    Copyright (C) 2011-2012  Dirk E. Wagner
 
 	based on:
     inputlircd -- zeroconf LIRC daemon that reads from /dev/input/event devices
@@ -43,18 +43,12 @@
 #include <pwd.h>
 #include <ctype.h>
 
-#include </usr/include/linux/input.h>
+/* Input subsystem interface */
+#include <linux/input.h>
+
+#include "debug.h"
 #include "hashmap.h"
-
-#define KEY_MAX_LENGTH (256)
-#define KEY_PREFIX ("somekey")
-#define KEY_COUNT (1024*1024)
-
-#ifdef DEBUG
-#define DBG(x...) printf (x)
-#else
-#define DBG(x...) {} 
-#endif
+#include "mapping.h"
 
 typedef struct {
   uint8_t	dummy;		// additional useless byte 
@@ -79,7 +73,7 @@ typedef struct client {
 
 static client_t *clients = NULL;
 
-static int sockfd;
+static int sockfd = 0;
 
 static bool grab = false;
 static char *device = "/var/run/lirc/lircd";
@@ -90,12 +84,6 @@ static int repeat = 0;
 
 static map_t mymap;
 
-typedef struct lirc_mapping
-{
-    char irmp_message[KEY_MAX_LENGTH];
-	char lirc_name[KEY_MAX_LENGTH];
-} map_entry_t;
-
 static void *xalloc(size_t size) {
 	void *buf = malloc(size);
 	if(!buf) {
@@ -104,54 +92,6 @@ static void *xalloc(size_t size) {
 	}
 	memset(buf, 0, size);
 	return buf;
-}
-
-static void parse_translation_table(const char *path) {
-	FILE *table;
-	char *line = NULL;
-	size_t line_size = 0;
-	char event_name[100];
-	char lirc_name[100];
-	int error = 0;
-	int len;
-
-	event_name[0] = lirc_name[0] = 0;	
-	if(!path)
-		return;
-
-	table = fopen(path, "r");
-	if(!table) {
-		fprintf(stderr, "Could not open translation table %s: %s\n", path, strerror(errno));
-		return;
-	}
-
-	while(getline(&line, &line_size, table) >= 0) {
-		len = sscanf(line, "%99s %99s", event_name, lirc_name);
-		if(len != 2) {
-			syslog(LOG_ERR, "line ignored: %s\n", line);
-			continue;
-		}
-		event_name[99] = '\0';
-		lirc_name[99] = '\0';
-		if(strlen(event_name) < 1 || strlen(lirc_name) < 1)
-			continue;
-
-		map_entry_t *map_entry = malloc(sizeof(map_entry_t));
-  		snprintf(map_entry->irmp_message, KEY_MAX_LENGTH, "%s", event_name);
-		snprintf(map_entry->lirc_name, KEY_MAX_LENGTH, "%s", lirc_name);
-
-		error = hashmap_put(mymap, map_entry->irmp_message, map_entry);			
-
-		if(error) {
-			fprintf(stderr, "hashmap_put failure: %d\n", error);
-			fclose(table);
-			free(line);
-			exit(EX_OSERR);
-		}
-	}
-
-	fclose(table);
-	free(line);
 }
 
 static void add_evdevs(int argc, char *argv[]) {
@@ -180,13 +120,13 @@ static void add_evdevs(int argc, char *argv[]) {
 	}
 }
 	
-static void add_unixsocket(void) {
+static bool add_unixsocket(void) {
 	struct sockaddr_un sa = {0};
 	sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
 
 	if(sockfd < 0) {
 		fprintf(stderr, "Unable to create an AF_UNIX socket: %s\n", strerror(errno));
-		exit(EX_OSERR);
+		return false;
 	}
 
 	sa.sun_family = AF_UNIX;
@@ -196,15 +136,17 @@ static void add_unixsocket(void) {
 
 	if(bind(sockfd, (struct sockaddr *)&sa, sizeof sa) < 0) {
 		fprintf(stderr, "Unable to bind AF_UNIX socket to %s: %s\n", device, strerror(errno));
-		exit(EX_OSERR);
+		return false;
 	}
 
 	chmod(device, 0666);
 
 	if(listen(sockfd, 3) < 0) {
 		fprintf(stderr, "Unable to listen on AF_UNIX socket: %s\n", strerror(errno));
-		exit(EX_OSERR);
+		return false;
 	}
+
+	return true;
 }
 
 
@@ -221,8 +163,8 @@ static void processnewclient(void) {
 		exit(EX_OSERR);
 	}
 
-        int flags = fcntl(newclient->fd, F_GETFL);
-        fcntl(newclient->fd, F_SETFL, flags | O_NONBLOCK);
+    int flags = fcntl(newclient->fd, F_GETFL);
+    fcntl(newclient->fd, F_SETFL, flags | O_NONBLOCK);
 
 	newclient->next = clients;
 	clients = newclient;
@@ -263,8 +205,8 @@ static void processevent(evdev_t *evdev) {
 	map_entry_t *map_entry;
 	
 	if(hashmap_get(mymap, hash_key, (void**)(&map_entry))==MAP_OK) {
-		DBG ("MAP_OK irmpd_fulldata=%s lirc=%s\n", irmp_fulldata, map_entry->lirc_name);	
-		len = snprintf(message, sizeof message, "%s %x %s %s\n",  irmp_fulldata, event.flags, map_entry->lirc_name, "IRMP");
+		DBG ("MAP_OK irmpd_fulldata=%s lirc=%s\n", irmp_fulldata, map_entry->value);	
+		len = snprintf(message, sizeof message, "%s %x %s %s\n",  irmp_fulldata, event.flags, map_entry->value, "IRMP");
 	} else {
 		DBG ("MAP_ERROR irmpd_fulldata=%s|\n", irmp_fulldata);	
 		len = snprintf(message, sizeof message, "%s %x %s %s\n",  irmp_fulldata, repeat, irmp_fulldata, "IRMP");
@@ -395,18 +337,29 @@ int main(int argc, char *argv[]) {
 
 	mymap = hashmap_new();
 	
-	parse_translation_table(translation_path);
+	if(!parse_translation_table(translation_path, mymap)) {
+		hashmap_free(mymap);
+		return EX_OSERR;
+	}
 
-	add_unixsocket();
+	if (!add_unixsocket()) {
+		hashmap_free(mymap);
+		if (sockfd) close (sockfd);
+		return EX_OSERR;
+	}
 
 	struct passwd *pwd = getpwnam(user);
 	if(!pwd) {
 		fprintf(stderr, "Unable to resolve user %s!\n", user);
+		hashmap_free(mymap);
+		if (sockfd) close (sockfd);
 		return EX_OSERR;
 	}
 
 	if(setgid(pwd->pw_gid) || setuid(pwd->pw_uid)) {
 		fprintf(stderr, "Unable to setuid/setguid to %s!\n", user);
+		hashmap_free(mymap);
+		if (sockfd) close (sockfd);
 		return EX_OSERR;
 	}
 
