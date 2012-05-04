@@ -73,7 +73,7 @@ typedef struct client {
 
 static client_t *clients = NULL;
 
-static int sockfd = 0;
+static int sockfd = -1;
 
 static bool grab = false;
 static char *device = "/var/run/lirc/lircd";
@@ -344,7 +344,7 @@ int main(int argc, char *argv[]) {
 
 	if (!add_unixsocket()) {
 		hashmap_free(mymap);
-		if (sockfd) close (sockfd);
+		if (sockfd >= 0) close (sockfd);
 		return EX_OSERR;
 	}
 
@@ -352,14 +352,14 @@ int main(int argc, char *argv[]) {
 	if(!pwd) {
 		fprintf(stderr, "Unable to resolve user %s!\n", user);
 		hashmap_free(mymap);
-		if (sockfd) close (sockfd);
+		if (sockfd >= 0) close (sockfd);
 		return EX_OSERR;
 	}
 
 	if(setgid(pwd->pw_gid) || setuid(pwd->pw_uid)) {
 		fprintf(stderr, "Unable to setuid/setguid to %s!\n", user);
 		hashmap_free(mymap);
-		if (sockfd) close (sockfd);
+		if (sockfd >= 0) close (sockfd);
 		return EX_OSERR;
 	}
 
@@ -372,8 +372,9 @@ int main(int argc, char *argv[]) {
 
 	main_loop();
 
-    /* Now, destroy the map */
-    hashmap_free(mymap);
-	
+	/* Now, destroy the map */
+	hashmap_free(mymap);
+	if (sockfd >= 0) close (sockfd);
+
 	return 0;
 }

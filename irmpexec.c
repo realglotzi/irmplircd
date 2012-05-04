@@ -53,7 +53,7 @@
 #include "hashmap.h"
 #include "mapping.h"
 
-static int lirc_fd = 0;
+static int lirc_fd = -1;
 static map_t mymap;
 static const char RemoteName[] = "IRMP-exec";
 
@@ -235,21 +235,21 @@ int main(int argc, char *argv[]) {
 
 	if (!add_unixsocket()) {
 		hashmap_free(mymap);
-		if (lirc_fd > 0) close(lirc_fd);
+		if (lirc_fd >= 0) close(lirc_fd);
 		return EX_OSERR;
 	}
 
 	struct passwd *pwd = getpwnam(user);
 	if(!pwd) {
 		hashmap_free(mymap);
-		if (lirc_fd > 0) close(lirc_fd);
+		if (lirc_fd >= 0) close(lirc_fd);
 		fprintf(stderr, "Unable to resolve user %s!\n", user);
 		return EX_OSERR;
 	}
 
 	if(setgid(pwd->pw_gid) || setuid(pwd->pw_uid)) {
 		hashmap_free(mymap);
-		if (lirc_fd > 0) close(lirc_fd);
+		if (lirc_fd >= 0) close(lirc_fd);
 		fprintf(stderr, "Unable to setuid/setguid to %s!\n", user);
 		return EX_OSERR;
 	}
@@ -264,8 +264,8 @@ int main(int argc, char *argv[]) {
 	main_loop(irw_mode);
 
 	/* Now, destroy the map */
-    hashmap_free(mymap);
-	close(lirc_fd);
+	hashmap_free(mymap);
+	if (lirc_fd >= 0) close(lirc_fd);
 	
 	return 0;
 }
