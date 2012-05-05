@@ -65,13 +65,16 @@ static struct sockaddr_un sa= {
 static bool add_unixsocket(void) {
 	lirc_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (lirc_fd < 0) {
-		fprintf(stderr, "Unable to create an AF_UNIX socket: %s\n", strerror(errno)); 
+		syslog (LOG_ERR, "Unable to create an AF_UNIX socket: %s", strerror(errno)); 
 		return false;
 	}
 	
 	fcntl (lirc_fd, F_SETFL, fcntl (lirc_fd, F_GETFL, 0));
+
 	if (connect (lirc_fd, (struct sockaddr*)&sa, sizeof(sa)) < 0) {
-		fprintf(stderr, "Unable to connect AF_UNIX socket %s: %s\n", sa.sun_path, strerror(errno)); 
+		syslog (LOG_ERR, "Unable to connect AF_UNIX socket %s: %s", sa.sun_path, strerror(errno));
+		close(lirc_fd);
+		lirc_fd = -1;
 		return false;
 	}
 	
@@ -89,14 +92,14 @@ static int file_ready(int FileDes, int TimeoutMs) {
 		timeout.tv_sec  = TimeoutMs / 1000;
 		timeout.tv_usec = (TimeoutMs % 1000) * 1000;
      	}
-	return select(FD_SETSIZE, &set, NULL, NULL, (TimeoutMs >= 0) ? &timeout : NULL) > 0 && FD_ISSET(FileDes, &set);
+	return select (FD_SETSIZE, &set, NULL, NULL, (TimeoutMs >= 0) ? &timeout : NULL) > 0 && FD_ISSET(FileDes, &set);
 }
 
 static int safe_read(int filedes, void *buffer, int size) {
 	for (;;) {
 		int p = read(filedes, buffer, size);
 		if (p < 0 && errno == EINTR) {
-			DBG("EINTR while reading from file handle %d - retrying", filedes);
+			syslog (LOG_ERR, "EINTR while reading from file handle %d - retrying", filedes);
 			continue;
 		}
 		return p;
@@ -105,25 +108,30 @@ static int safe_read(int filedes, void *buffer, int size) {
 
 static int wait_for_keycode (char *lircbuf) {
 
-	struct pollfd pfd={
-		.fd=lirc_fd,
-		.events=POLLIN,
-		.revents=0
-	};
-
-	int size = 0;
+	int size = -1;
 	int ready = 0;
 	
-	if (poll (&pfd, 1, -1) > 0) {
-		ready = file_ready(lirc_fd, -1);
+	ready = file_ready(lirc_fd, -1);
 
-		size = safe_read (lirc_fd, lircbuf, BUFSIZ);
+	size = ready ? safe_read (lirc_fd, lircbuf, BUFSIZ) : -1;
 	
-//		DBG ("ready=%d size=%d\n", ready, size);
+//	DBG ("ready=%d size=%d\n", ready, size);
 		
-		if (ready && size > 0) {
-			lircbuf [size-1] = '\0';
+	if (ready && size <= 0) {
+		syslog (LOG_ERR, "LIRC connection broken. Try to reconnect");
+		close(lirc_fd);
+		lirc_fd = -1;
+		while (lirc_fd < 0) {
+			sleep (3);
+			if (add_unixsocket()) {
+				syslog (LOG_INFO, "Reconnected to LIRC\n");
+				break;
+			}
 		}
+	} else 
+
+	if (ready && size > 0) {
+		lircbuf [size-1] = '\0';
 	}
 
 	return size;
@@ -183,9 +191,6 @@ static void main_loop(bool irw_mode) {
 				DBG ("Wrong ID %s, code ignored\n", id);
 			}
 			
-		} else {
-			syslog(LOG_INFO, "LIRC died, terminating...\n");
-			break;
 		}
 	} while (true);
 
