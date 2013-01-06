@@ -167,7 +167,7 @@ static void main_loop(bool irw_mode) {
 		if ((bufSize = wait_for_keycode (lircbuf)) > 0) {
 			sscanf (lircbuf, "%s %d %s %s", irmp_data, &repeat, irmp_code, id);
 			DBG ("irmpdata=%s repeat=%d irmp_code=%s id=%s\n", irmp_data, repeat, irmp_code, id);
-			if (strncmp (id, "IRMP", 4) == 0) {
+			if (strncasecmp (id, "IRMP", 4) == 0) {
 				if (irw_mode) {
 					printf ("%s\t|%d\t|%s\t|%s\n", irmp_data, repeat, irmp_code, id);
 				} else {
