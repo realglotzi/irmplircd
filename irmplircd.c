@@ -294,8 +294,7 @@ int main(int argc, char *argv[]) {
 	char *translation_path = NULL;
 	int opt;
 	bool foreground = false;
-	bool use_translationtable = false;
-	
+
 	gettimeofday(&previous_input, NULL);
 
 	while((opt = getopt(argc, argv, "d:gm:fu:r:t:")) != -1) {
@@ -316,7 +315,6 @@ int main(int argc, char *argv[]) {
 				repeat_time = atoi(optarg) * 1000L;
 				break;
 			case 't':
-				use_translationtable = true;
 				translation_path = strdup(optarg);
 				break;
             default:
@@ -339,7 +337,7 @@ int main(int argc, char *argv[]) {
 
 	mymap = hashmap_new();
 	
-	if(use_translationtable &&  !parse_translation_table(translation_path, mymap)) {
+	if(!parse_translation_table(translation_path, mymap)) {
 		hashmap_free(mymap);
 		return EX_OSERR;
 	}
