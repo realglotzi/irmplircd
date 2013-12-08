@@ -203,7 +203,8 @@ int main(int argc, char *argv[]) {
 	int opt;
 	bool foreground = false;
 	bool irw_mode = false;
-
+	bool use_translationtable = false;
+	
 	while ((opt = getopt(argc, argv, "whd:fu:t:")) != -1) {
         	switch (opt) {
 			case 'd':
@@ -216,6 +217,7 @@ int main(int argc, char *argv[]) {
 				foreground = true;
 				break;
 			case 't':
+				use_translationtable = true;
 				translation_path = strdup (optarg);
 				break;
 			case 'w':
@@ -233,7 +235,7 @@ int main(int argc, char *argv[]) {
 
 	mymap = hashmap_new();
 	
-	if (!parse_translation_table(translation_path, mymap)) {
+	if (use_translationtable && !parse_translation_table(translation_path, mymap)) {
 		hashmap_free(mymap);
 		return EX_OSERR;
 	}
