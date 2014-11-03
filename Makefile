@@ -7,9 +7,8 @@ CFLAGS ?= -Wall -g -O2 -pipe -Ic_hashmap #-DDEBUG
 PREFIX ?= /usr/local
 INSTALL ?= install
 STRIP ?= strip
-SBINDIR ?= $(PREFIX)/sbin
-BINDIR  ?= $(PREFIX)/bin
-SHAREDIR ?= $(PREFIX)/share
+BINDIR  ?= $(DESTDIR)$(PREFIX)/bin
+SHAREDIR ?= $(DESTDIR)$(PREFIX)/share
 MANDIR ?= $(SHAREDIR)/man
 
 all: $(SBIN_IRMPLIRCD) $(SBIN_IRMPEXEC)
@@ -35,15 +34,15 @@ irmpexec: irmpexec.o mapping.o c_hashmap/hashmap.o
 install: install-sbin install-man
 
 install-sbin: $(SBIN_IRMPLIRCD) $(SBIN_IRMPEXEC)
-	mkdir -p $(SBINDIR)
+	mkdir -p $(BINDIR)
 	$(STRIP) $(SBIN_IRMPLIRCD)
 	$(STRIP) $(SBIN_IRMPEXEC)
 	$(INSTALL) $(SBIN_IRMPLIRCD) $(BINDIR)/
 	$(INSTALL) $(SBIN_IRMPEXEC) $(BINDIR)/
 
 install-man: $(MAN1) $(MAN5) $(MAN8)
-	mkdir -p $(DESTDIR)$(MANDIR)/man8/
-	$(INSTALL) -m 644 $(MAN8) $(DESTDIR)$(MANDIR)/man8/
+	mkdir -p $(MANDIR)/man8/
+	$(INSTALL) -m 644 $(MAN8) $(MANDIR)/man8/
 
 clean:
 	rm -f $(SBIN_IRMPLIRCD) $(SBIN_IRMPEXEC) *.o c_hashmap/hashmap.o
