@@ -1,7 +1,7 @@
 /*
     irmplircd -- zeroconf LIRC daemon that reads IRMP events from the USB IR Remote Receiver
 	             http://www.mikrocontroller.net/articles/USB_IR_Remote_Receiver
-    Copyright (C) 2011-2012  Dirk E. Wagner
+    Copyright (C) 2011-2014  Dirk E. Wagner
 
 	based on:
     inputlircd -- zeroconf LIRC daemon that reads from /dev/input/event devices
@@ -79,10 +79,22 @@ static bool grab = false;
 static char *device = "/var/run/lirc/lircd";
 
 static long repeat_time = 0L;
-static struct timeval previous_input;
+
 static int repeat = 0;
 
 static map_t mymap;
+
+/* returns time since 01.01.1970 */
+static double getTime_ms(void) {
+	struct timeval sTime;
+	struct timezone tz;	
+	double dTime_ms;
+	
+	gettimeofday(&sTime, &tz);	
+	dTime_ms=((double) sTime.tv_sec * (double)1000);
+	dTime_ms+=(sTime.tv_usec/1000);
+	return dTime_ms;
+}
 
 static void *xalloc(size_t size) {
 	void *buf = malloc(size);
@@ -170,17 +182,13 @@ static void processnewclient(void) {
 	clients = newclient;
 }
 
-static long time_elapsed(struct timeval *last, struct timeval *current) {
-	long seconds = current->tv_sec - last->tv_sec;
-	return 1000000 * seconds + current->tv_usec - last->tv_usec;
-}
-
 static void processevent(evdev_t *evdev) {
 	IRMP_DATA event;
 	char hash_key[100];
 	char irmp_fulldata[100];
 	char message[100];
 	int len;
+	double start_time = 0;
 	client_t *client, *prev, *next;
 
 	message[0]=0;
@@ -192,29 +200,35 @@ static void processevent(evdev_t *evdev) {
 
 	DBG ("dummy = 0x%02d, p = %02d, a = 0x%04x, c = 0x%04x, f = 0x%02x\n", event.dummy, event.protocol, event.address, event.command, event.flags);
 		
-	struct timeval current;
-	gettimeofday(&current, NULL);
-	if(time_elapsed(&previous_input, &current) < repeat_time)
-		repeat++;
-	else 
+	if(event.flags == 0)	{
+		start_time = getTime_ms();
 		repeat = 0;
+	} else {
+		if((getTime_ms()-start_time) < repeat_time) {
+			return;
+		} else {
+			start_time=getTime_ms();		
+			repeat++;
+		}
+	}
+	snprintf (irmp_fulldata, sizeof irmp_fulldata, "%02x%04x%04x%02x", event.protocol, event.address, event.command, 0);
 
-	snprintf (irmp_fulldata, sizeof irmp_fulldata, "%02x%04x%04x%02x", event.protocol, event.address, event.command, event.flags);
 	snprintf (hash_key, sizeof hash_key, "%02x%04x%04x%02x", event.protocol, event.address, event.command, 0);
 
 	map_entry_t *map_entry;
 	
 	if(hashmap_get(mymap, hash_key, (void**)(&map_entry))==MAP_OK) {
 		DBG ("MAP_OK irmpd_fulldata=%s lirc=%s\n", irmp_fulldata, map_entry->value);	
-		len = snprintf(message, sizeof message, "%s %x %s %s\n",  irmp_fulldata, event.flags, map_entry->value, "IRMP");
+
+		len = snprintf(message, sizeof message, "%s %x %s %s\n",  irmp_fulldata, repeat, map_entry->value, "IRMP");
 	} else {
 		DBG ("MAP_ERROR irmpd_fulldata=%s|\n", irmp_fulldata);	
+
 		len = snprintf(message, sizeof message, "%s %x %s %s\n",  irmp_fulldata, repeat, irmp_fulldata, "IRMP");
 	}
 	
 	DBG ("LIRC message=%s\n", message);
 
-	previous_input = current;
 	for(client = clients; client; client = client->next) {
 		if(write(client->fd, message, len) != len) {
 			close(client->fd);
@@ -242,7 +256,7 @@ static void print_help() {
 	printf("Options: \n");
 	printf("\t-d <socket> UNIX socket. The default is /var/run/lirc/lircd.\n");
 	printf("\t-f Run in the foreground.\n");
-	printf("\t-r <rate> Repeat rate in ms.\n");
+	printf("\t-r <rate> Repeat rate in ms (0 -> IR Remote repeate rate), 500 break's to 0,5s repeate rate\n");
 	printf("\t-g Grab the input device(s).\n");
 	printf("\t-u <user> User name.\n");
 	printf("\t-t <path> Path to translation table.\n");
@@ -294,9 +308,8 @@ int main(int argc, char *argv[]) {
 	char *translation_path = NULL;
 	int opt;
 	bool foreground = false;
+	bool use_translationtable = false;
 	
-	gettimeofday(&previous_input, NULL);
-
 	while((opt = getopt(argc, argv, "d:gm:fu:r:t:")) != -1) {
         switch(opt) {
 			case 'd':
@@ -312,9 +325,10 @@ int main(int argc, char *argv[]) {
 				foreground = true;
 				break;
 			case 'r':
-				repeat_time = atoi(optarg) * 1000L;
+				repeat_time = atoi(optarg);
 				break;
 			case 't':
+				use_translationtable = true;
 				translation_path = strdup(optarg);
 				break;
             default:
@@ -337,7 +351,7 @@ int main(int argc, char *argv[]) {
 
 	mymap = hashmap_new();
 	
-	if(translation_path != NULL && !parse_translation_table(translation_path, mymap)) {
+	if(use_translationtable &&  !parse_translation_table(translation_path, mymap)) {
 		hashmap_free(mymap);
 		return EX_OSERR;
 	}
