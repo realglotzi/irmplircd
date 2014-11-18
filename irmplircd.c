@@ -188,7 +188,7 @@ static void processevent(evdev_t *evdev) {
 	char irmp_fulldata[100];
 	char message[100];
 	int len;
-	double start_time = 0;
+	static double start_time = 0;
 	client_t *client, *prev, *next;
 
 	message[0]=0;
