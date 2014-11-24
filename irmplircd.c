@@ -51,7 +51,7 @@
 #include "mapping.h"
 
 typedef struct {
-  uint8_t	dummy;		// additional useless byte 
+  uint8_t	report_id;	// report id
   uint8_t	protocol;	// protocol, i.e. NEC_PROTOCOL
   uint16_t	address;	// address
   uint16_t	command;	// command
@@ -198,8 +198,11 @@ static void processevent(evdev_t *evdev) {
 		exit(EX_OSERR);
 	}
 
-	DBG ("dummy = 0x%02d, p = %02d, a = 0x%04x, c = 0x%04x, f = 0x%02x\n", event.dummy, event.protocol, event.address, event.command, event.flags);
-		
+	DBG ("report_id = 0x%02d, p = %02d, a = 0x%04x, c = 0x%04x, f = 0x%02x\n", event.report_id, event.protocol, event.address, event.command, event.flags);
+
+	if(event.report_id != 0x01)
+		return;
+
 	if(event.flags == 0)	{
 		start_time = getTime_ms();
 		repeat = 0;
