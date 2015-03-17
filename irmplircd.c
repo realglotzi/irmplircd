@@ -50,7 +50,7 @@
 #include "hashmap.h"
 #include "mapping.h"
 
-typedef struct {
+typedef struct __attribute__ ((__packed__)) {
   uint8_t	report_id;	// report id
   uint8_t	protocol;	// protocol, i.e. NEC_PROTOCOL
   uint16_t	address;	// address
