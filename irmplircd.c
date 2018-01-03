@@ -78,7 +78,8 @@ static int sockfd = -1;
 static bool grab = false;
 static char *device = "/var/run/lirc/lircd";
 
-static long repeat_time = 0L;
+static long repeat_delay = 0L;
+static long repeat_period = 0L;
 
 static int repeat = 0;
 
@@ -188,7 +189,8 @@ static void processevent(evdev_t *evdev) {
 	char irmp_fulldata[100];
 	char message[100];
 	int len;
-	static double start_time = 0;
+	static double first_time = 0;
+	static double last_time = 0;
 	client_t *client, *prev, *next;
 
 	message[0]=0;
@@ -204,13 +206,13 @@ static void processevent(evdev_t *evdev) {
 		return;
 
 	if(event.flags == 0)	{
-		start_time = getTime_ms();
+		first_time = getTime_ms();
 		repeat = 0;
 	} else {
-		if((getTime_ms()-start_time) < repeat_time) {
+		if(((getTime_ms()-first_time) < repeat_delay) || (getTime_ms()-last_time) < repeat_period) {
 			return;
 		} else {
-			start_time=getTime_ms();		
+			last_time=getTime_ms();
 			repeat++;
 		}
 	}
@@ -255,11 +257,12 @@ static void processevent(evdev_t *evdev) {
 
 static void print_help() {
 
-	printf("irmplircd [-d socket] [-f] [-c] [-r repeat-rate] [-m keycode] -u username] device [device ...]\n\n");
+	printf("irmplircd [-d socket] [-f] [-c] [-r repeat-delay] [-s repeat-period] [-m keycode] -u username] device [device ...]\n\n");
 	printf("Options: \n");
 	printf("\t-d <socket> UNIX socket. The default is /var/run/lirc/lircd.\n");
 	printf("\t-f Run in the foreground.\n");
-	printf("\t-r <rate> Repeat rate in ms (0 -> IR Remote repeate rate), 500 break's to 0,5s repeate rate\n");
+	printf("\t-r <delay> Repeat delay in ms (delay for first repeat\n");
+	printf("\t-s <period> Repeat period in ms (delay for further repeats\n");
 	printf("\t-g Grab the input device(s).\n");
 	printf("\t-u <user> User name.\n");
 	printf("\t-t <path> Path to translation table.\n");
@@ -313,7 +316,7 @@ int main(int argc, char *argv[]) {
 	bool foreground = false;
 	bool use_translationtable = false;
 	
-	while((opt = getopt(argc, argv, "d:gm:fu:r:t:")) != -1) {
+	while((opt = getopt(argc, argv, "d:gm:fu:r:s:t:")) != -1) {
         switch(opt) {
 			case 'd':
 				device = strdup(optarg);
@@ -328,7 +331,10 @@ int main(int argc, char *argv[]) {
 				foreground = true;
 				break;
 			case 'r':
-				repeat_time = atoi(optarg);
+				repeat_delay = atoi(optarg);
+				break;
+			case 's':
+				repeat_period = atoi(optarg);
 				break;
 			case 't':
 				use_translationtable = true;
