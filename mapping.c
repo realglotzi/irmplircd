@@ -66,7 +66,7 @@ bool parse_translation_table(const char *path, map_t mymap) {
 		if (strcspn(line, "\n\r#") == 0)
 			continue;
 
-		len = sscanf(line, "%99s %99s", key, value);
+		len = sscanf(line, "%99s %99[^\n]", key, value);
 		if(len != 2) {
 			syslog(LOG_ERR, "line ignored: %s\n", line);
 			continue;
