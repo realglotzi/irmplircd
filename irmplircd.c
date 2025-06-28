@@ -82,6 +82,7 @@ static long repeat_delay = 0L;
 static long repeat_period = 0L;
 
 static int repeat = 0;
+static uint8_t protocol = 0;
 
 static map_t mymap;
 
@@ -194,6 +195,7 @@ static void processevent(evdev_t *evdev) {
 	client_t *client, *prev, *next;
 
 	message[0]=0;
+	char remote_name[5];
 	
 	if((len=read(evdev->fd, &event, sizeof event)) <= 0) {
 		syslog(LOG_ERR, "Error processing event from %s: %s\n", evdev->name, strerror(errno));
@@ -222,14 +224,17 @@ static void processevent(evdev_t *evdev) {
 
 	map_entry_t *map_entry;
 	
+	snprintf(remote_name, sizeof(remote_name), "%s", event.protocol == protocol ? "IRMP" : "NEWP");
+	protocol = event.protocol;
+
 	if(hashmap_get(mymap, hash_key, (void**)(&map_entry))==MAP_OK) {
 		DBG ("MAP_OK irmpd_fulldata=%s lirc=%s\n", irmp_fulldata, map_entry->value);	
 
-		len = snprintf(message, sizeof message, "%s %x %s %s\n",  irmp_fulldata, repeat, map_entry->value, "IRMP");
+		len = snprintf(message, sizeof message, "%s %x %s %s\n",  irmp_fulldata, repeat, map_entry->value, remote_name);
 	} else {
 		DBG ("MAP_ERROR irmpd_fulldata=%s|\n", irmp_fulldata);	
 
-		len = snprintf(message, sizeof message, "%s %x %s %s\n",  irmp_fulldata, repeat, irmp_fulldata, "IRMP");
+		len = snprintf(message, sizeof message, "%s %x %s %s\n",  irmp_fulldata, repeat, irmp_fulldata, remote_name);
 	}
 	
 	DBG ("LIRC message=%s\n", message);
