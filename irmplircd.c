@@ -207,10 +207,11 @@ static void processevent(evdev_t *evdev) {
 	if(event.report_id != 0x01)
 		return;
 
-	if(event.flags == 0)	{
+	if(event.flags == 0) {
 		first_time = getTime_ms();
 		repeat = 0;
-	} else {
+	}
+	if(event.flags == 1) {
 		if(((getTime_ms()-first_time) < repeat_delay) || (getTime_ms()-last_time) < repeat_period) {
 			return;
 		} else {
@@ -218,6 +219,7 @@ static void processevent(evdev_t *evdev) {
 			repeat++;
 		}
 	}
+
 	snprintf (irmp_fulldata, sizeof irmp_fulldata, "%02x%04x%04x%02x", event.protocol, event.address, event.command, 0);
 
 	snprintf (hash_key, sizeof hash_key, "%02x%04x%04x%02x", event.protocol, event.address, event.command, 0);
@@ -228,11 +230,11 @@ static void processevent(evdev_t *evdev) {
 	protocol = event.protocol;
 
 	if(hashmap_get(mymap, hash_key, (void**)(&map_entry))==MAP_OK) {
-		DBG ("MAP_OK irmpd_fulldata=%s lirc=%s\n", irmp_fulldata, map_entry->value);	
+		DBG ("MAP_OK irmpd_fulldata=%s lirc=%s\n", irmp_fulldata, map_entry->value);
 
-		len = snprintf(message, sizeof message, "%s %x %s %s\n",  irmp_fulldata, repeat, map_entry->value, remote_name);
+		len = snprintf(message, sizeof message, "%s %x %s%s %s\n",  irmp_fulldata, repeat, map_entry->value, event.flags == 2 ? "_UP" : "", remote_name);
 	} else {
-		DBG ("MAP_ERROR irmpd_fulldata=%s|\n", irmp_fulldata);	
+		DBG ("MAP_ERROR irmpd_fulldata=%s|\n", irmp_fulldata);
 
 		len = snprintf(message, sizeof message, "%s %x %s %s\n",  irmp_fulldata, repeat, irmp_fulldata, remote_name);
 	}
