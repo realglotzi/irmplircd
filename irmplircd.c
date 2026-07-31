@@ -50,6 +50,12 @@
 #include "hashmap.h"
 #include "mapping.h"
 
+#define IRMP_FLAG_NEW            0x00
+#define IRMP_FLAG_REPETITION     0x01
+#define IRMP_FLAG_RELEASE        0x02
+
+#define REPORT_ID_IR             0x01
+
 typedef struct __attribute__ ((__packed__)) {
   uint8_t	report_id;	// report id
   uint8_t	protocol;	// protocol, i.e. NEC_PROTOCOL
@@ -186,7 +192,6 @@ static void processnewclient(void) {
 
 static void processevent(evdev_t *evdev) {
 	IRMP_DATA event;
-	char hash_key[100];
 	char irmp_fulldata[100];
 	char message[100];
 	int len;
@@ -194,7 +199,6 @@ static void processevent(evdev_t *evdev) {
 	static double last_time = 0;
 	client_t *client, *prev, *next;
 
-	message[0]=0;
 	char remote_name[5];
 	
 	if((len=read(evdev->fd, &event, sizeof event)) <= 0) {
@@ -202,17 +206,17 @@ static void processevent(evdev_t *evdev) {
 		exit(EX_OSERR);
 	}
 
+	if (event.report_id == REPORT_ID_IR)
 	DBG ("report_id = 0x%02d, p = %02d, a = 0x%04x, c = 0x%04x, f = 0x%02x\n", event.report_id, event.protocol, event.address, event.command, event.flags);
+	else
+	    return;
 
-	if(event.report_id != 0x01)
-		return;
-
-	if(event.flags == 0) {
+	if(event.flags == IRMP_FLAG_NEW) {
 		first_time = getTime_ms();
 		repeat = 0;
 	}
-	if(event.flags == 1) {
-		if(((getTime_ms()-first_time) < repeat_delay) || (getTime_ms()-last_time) < repeat_period) {
+	if(event.flags == IRMP_FLAG_REPETITION) {
+		if(((getTime_ms() - first_time) < repeat_delay) || (getTime_ms() - last_time) < repeat_period) {
 			return;
 		} else {
 			last_time=getTime_ms();
@@ -222,20 +226,16 @@ static void processevent(evdev_t *evdev) {
 
 	snprintf (irmp_fulldata, sizeof irmp_fulldata, "%02x%04x%04x%02x", event.protocol, event.address, event.command, 0);
 
-	snprintf (hash_key, sizeof hash_key, "%02x%04x%04x%02x", event.protocol, event.address, event.command, 0);
-
 	map_entry_t *map_entry;
 	
 	snprintf(remote_name, sizeof(remote_name), "%s", event.protocol == protocol ? "IRMP" : "NEWP");
 	protocol = event.protocol;
 
-	if(hashmap_get(mymap, hash_key, (void**)(&map_entry))==MAP_OK) {
-		DBG ("MAP_OK irmpd_fulldata=%s lirc=%s\n", irmp_fulldata, map_entry->value);
-
+	if(hashmap_get(mymap, irmp_fulldata, (void**)(&map_entry))==MAP_OK) {
+		DBG ("MAP_OK irmp_fulldata=%s lirc=%s\n", irmp_fulldata, map_entry->value);
 		len = snprintf(message, sizeof message, "%s %x %s%s %s\n",  irmp_fulldata, repeat, map_entry->value, event.flags == 2 ? "_UP" : "", remote_name);
 	} else {
 		DBG ("MAP_ERROR irmpd_fulldata=%s|\n", irmp_fulldata);
-
 		len = snprintf(message, sizeof message, "%s %x %s %s\n",  irmp_fulldata, repeat, irmp_fulldata, remote_name);
 	}
 	

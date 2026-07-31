@@ -55,7 +55,7 @@
 
 static int lirc_fd = -1;
 static map_t mymap;
-static const char RemoteName[] = "IRMP-exec";
+//static const char RemoteName[] = "IRMP-exec";
 
 static struct sockaddr_un sa= {
 	.sun_family = AF_UNIX,
