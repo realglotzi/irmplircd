@@ -24,7 +24,7 @@
 #ifndef __MAPPING_H__
 #define __MAPPING_H__
  
-#define KEY_MAX_LENGTH (256)
+#define KEY_MAX_LENGTH (32)
 
 typedef struct {
 	char key[KEY_MAX_LENGTH];

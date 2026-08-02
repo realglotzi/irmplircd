@@ -84,8 +84,8 @@ static int sockfd = -1;
 static bool grab = false;
 static char *device = "/var/run/lirc/lircd";
 
-static long repeat_delay = 0L;
-static long repeat_period = 0L;
+static int repeat_delay = 0L;
+static int repeat_period = 0L;
 
 static int repeat = 0;
 static uint8_t protocol = 0;
@@ -95,10 +95,10 @@ static map_t mymap;
 /* returns time since 01.01.1970 */
 static double getTime_ms(void) {
 	struct timeval sTime;
-	struct timezone tz;	
+	struct timezone tz;
 	double dTime_ms;
 	
-	gettimeofday(&sTime, &tz);	
+	gettimeofday(&sTime, &tz);
 	dTime_ms=((double) sTime.tv_sec * (double)1000);
 	dTime_ms+=(sTime.tv_usec/1000);
 	return dTime_ms;
@@ -192,9 +192,9 @@ static void processnewclient(void) {
 
 static void processevent(evdev_t *evdev) {
 	IRMP_DATA event;
-	char irmp_fulldata[100];
-	char message[100];
-	static char release_pending_message[400];
+	char irmp_fulldata[13];
+	char message[56];
+	static char release_pending_message[56];
 	int len, release_pending_len = 0;
 	static double first_time = 0;
 	static double last_time = 0;
@@ -257,7 +257,7 @@ static void processevent(evdev_t *evdev) {
 			DBG ("release_pending_message: %s\n", release_pending_message);
 		}
 	} else {
-		DBG ("MAP_ERROR irmpd_fulldata=%s\n", irmp_fulldata);
+		DBG ("MAP_ERROR irmp_fulldata=%s\n", irmp_fulldata);
 		len = snprintf(message, sizeof message, "%s %x %s %s",  irmp_fulldata, repeat, irmp_fulldata, remote_name);
 	}
 
