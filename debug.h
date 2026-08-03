@@ -25,7 +25,7 @@
 #define __DEBUG_H__
 
 #ifdef DEBUG
-	#define DBG(x...) printf (x)
+	#define DBG(x, ...) printf (x, ##__VA_ARGS__)
 #else
 	#define DBG(x...) {}
 #endif
