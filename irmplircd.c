@@ -84,10 +84,10 @@ static int sockfd = -1;
 static bool grab = false;
 static char *device = "/var/run/lirc/lircd";
 
-static int repeat_delay = 0L;
-static int repeat_period = 0L;
+static int repeat_delay = 0;
+static int repeat_period = 0;
 
-static int repeat = 0;
+static uint16_t repeat = 0;
 static uint8_t protocol = 0;
 
 static map_t mymap;
@@ -99,8 +99,8 @@ static double getTime_ms(void) {
 	double dTime_ms;
 	
 	gettimeofday(&sTime, &tz);
-	dTime_ms=((double) sTime.tv_sec * (double)1000);
-	dTime_ms+=(sTime.tv_usec/1000);
+	dTime_ms=((double) sTime.tv_sec * 1000);
+	dTime_ms+=((double) sTime.tv_usec/1000);
 	return dTime_ms;
 }
 
@@ -193,8 +193,8 @@ static void processnewclient(void) {
 static void processevent(evdev_t *evdev) {
 	IRMP_DATA event;
 	char irmp_fulldata[13];
-	char message[56];
-	static char release_pending_message[56];
+	char message[58];
+	static char release_pending_message[58];
 	int len, release_pending_len = 0;
 	static double first_time = 0;
 	static double last_time = 0;
@@ -214,7 +214,7 @@ static void processevent(evdev_t *evdev) {
 		return;
 
 	if(event.flags == IRMP_FLAG_NEW) {
-		DBG("delta %f\n", getTime_ms() - first_time);
+		//DBG("delta %.2f\n", getTime_ms() - first_time);
 		first_time = getTime_ms();
 		repeat = 0;
 		if (release_pending) {
@@ -242,7 +242,7 @@ static void processevent(evdev_t *evdev) {
 	if (event.flags == IRMP_FLAG_RELEASE)
 		release_pending = false;
 
-	snprintf (irmp_fulldata, sizeof irmp_fulldata, "%02x%04x%04x%02x", event.protocol, event.address, event.command, 0);
+	snprintf (irmp_fulldata, sizeof irmp_fulldata, "%02x%04x%04x%02x", event.protocol, event.address, event.command, 0); // 2+4+4+2+1=13
 
 	map_entry_t *map_entry;
 	
@@ -251,17 +251,17 @@ static void processevent(evdev_t *evdev) {
 
 	if(hashmap_get(mymap, irmp_fulldata, (void**)(&map_entry))==MAP_OK) {
 		DBG ("MAP_OK irmp_fulldata=%s lirc=%s\n", irmp_fulldata, map_entry->value);
-		len = snprintf(message, sizeof message, "%s %x %s%s %s",  irmp_fulldata, repeat, map_entry->value, event.flags == IRMP_FLAG_RELEASE ? "_UP" : "", remote_name);
+		len = snprintf(message, sizeof message, "%s %x %s%s %s",  irmp_fulldata, repeat, map_entry->value, event.flags == IRMP_FLAG_RELEASE ? "_UP" : "", remote_name); // 12+1+4+1+31+3+1+4+1=58
 		if (event.flags == IRMP_FLAG_NEW) {
 			release_pending_len = snprintf(release_pending_message, sizeof release_pending_message, "%s %x %s%s %s",  irmp_fulldata, repeat, map_entry->value, "_UP", remote_name);
-			DBG ("release_pending_message: %s\n", release_pending_message);
+			//DBG ("release_pending_message: %s\n", release_pending_message);
 		}
 	} else {
 		DBG ("MAP_ERROR irmp_fulldata=%s\n", irmp_fulldata);
 		len = snprintf(message, sizeof message, "%s %x %s %s",  irmp_fulldata, repeat, irmp_fulldata, remote_name);
 	}
 
-	DBG ("LIRC message=%s %s, since last sent: %f\n", message, release_pending ? "release pending" : "release not pending", getTime_ms() - send_time);
+	DBG ("LIRC message=%s %s, since last sent: %.2f\n\n", message, release_pending ? "release pending" : "release not pending", getTime_ms() - send_time);
 	send_time = getTime_ms();
 
 	for(client = clients; client; client = client->next) {
