@@ -208,9 +208,9 @@ static void processevent(evdev_t *evdev) {
 		exit(EX_OSERR);
 	}
 
-	if (event.report_id == REPORT_ID_IR)
+	if (event.report_id == REPORT_ID_IR) {
 		DBG ("report_id = 0x%02d, p = %02d, a = 0x%04x, c = 0x%04x, f = 0x%02x\n", event.report_id, event.protocol, event.address, event.command, event.flags);
-	else
+	} else
 		return;
 
 	if(event.flags == IRMP_FLAG_NEW) {
