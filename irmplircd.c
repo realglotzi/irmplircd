@@ -193,8 +193,8 @@ static void processnewclient(void) {
 static void processevent(evdev_t *evdev) {
 	IRMP_DATA event;
 	char irmp_fulldata[13];
-	char message[58];
-	static char release_pending_message[58];
+	char message[59];
+	static char release_pending_message[59];
 	int len, release_pending_len = 0;
 	static double first_time = 0;
 	static double last_time = 0;
@@ -251,14 +251,14 @@ static void processevent(evdev_t *evdev) {
 
 	if(hashmap_get(mymap, irmp_fulldata, (void**)(&map_entry))==MAP_OK) {
 		DBG ("MAP_OK irmp_fulldata=%s lirc=%s\n", irmp_fulldata, map_entry->value);
-		len = snprintf(message, sizeof message, "%s %x %s%s %s",  irmp_fulldata, repeat, map_entry->value, event.flags == IRMP_FLAG_RELEASE ? "_UP" : "", remote_name); // 12+1+4+1+31+3+1+4+1=58
+		len = snprintf(message, sizeof message, "%s %x %s%s %s\n",  irmp_fulldata, repeat, map_entry->value, event.flags == IRMP_FLAG_RELEASE ? "_UP" : "", remote_name); // 12+1+4+1+31+3+1+4+1=58
 		if (event.flags == IRMP_FLAG_NEW) {
-			release_pending_len = snprintf(release_pending_message, sizeof release_pending_message, "%s %x %s%s %s",  irmp_fulldata, repeat, map_entry->value, "_UP", remote_name);
+			release_pending_len = snprintf(release_pending_message, sizeof release_pending_message, "%s %x %s%s %s\n",  irmp_fulldata, repeat, map_entry->value, "_UP", remote_name);
 			//DBG ("release_pending_message: %s\n", release_pending_message);
 		}
 	} else {
 		DBG ("MAP_ERROR irmp_fulldata=%s\n", irmp_fulldata);
-		len = snprintf(message, sizeof message, "%s %x %s %s",  irmp_fulldata, repeat, irmp_fulldata, remote_name);
+		len = snprintf(message, sizeof message, "%s %x %s %s\n",  irmp_fulldata, repeat, irmp_fulldata, remote_name);
 	}
 
 	DBG ("LIRC message=%s %s, since last sent: %.2f\n\n", message, release_pending ? "release pending" : "release not pending", getTime_ms() - send_time);
