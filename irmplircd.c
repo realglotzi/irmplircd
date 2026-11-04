@@ -53,7 +53,6 @@
 #define IRMP_FLAG_NEW            0x00
 #define IRMP_FLAG_REPETITION     0x01
 #define IRMP_FLAG_RELEASE        0x02
-#define IRMP_FLAG_FORCE_RELEASE  0x04
 
 #define REPORT_ID_IR             0x01
 
@@ -213,11 +212,11 @@ static void processevent(evdev_t *evdev) {
 	} else
 		return;
 
-	if((event.flags & 0x07) == IRMP_FLAG_NEW) {
+	if((event.flags & (IRMP_FLAG_REPETITION || IRMP_FLAG_RELEASE)) == IRMP_FLAG_NEW) {
 		//DBG("delta %.2f\n", getTime_ms() - first_time);
 		first_time = getTime_ms();
 		repeat = 0;
-	} else if((event.flags & 0x07) == IRMP_FLAG_REPETITION) {
+	} else if(event.flags & IRMP_FLAG_REPETITION) {
 		if(((getTime_ms() - first_time) < repeat_delay) || (getTime_ms() - last_time) < repeat_period) {
 			return;
 		} else {
@@ -235,7 +234,7 @@ static void processevent(evdev_t *evdev) {
 
 	if(hashmap_get(mymap, irmp_fulldata, (void**)(&map_entry)) == MAP_OK) {
 		DBG ("MAP_OK irmp_fulldata=%s lirc=%s\n", irmp_fulldata, map_entry->value);
-		len = snprintf(message, sizeof message, "%s %x %s%s %s\n",  irmp_fulldata, repeat, map_entry->value, (event.flags & IRMP_FLAG_RELEASE) == IRMP_FLAG_RELEASE ? "_UP" : "", remote_name); // 12+1+4+1+31+3+1+4+1+1=59
+		len = snprintf(message, sizeof message, "%s %x %s%s %s\n",  irmp_fulldata, repeat, map_entry->value, (event.flags & IRMP_FLAG_RELEASE) ? "_UP" : "", remote_name); // 12+1+4+1+31+3+1+4+1+1=59
 	} else {
 		DBG ("MAP_ERROR irmp_fulldata=%s\n", irmp_fulldata);
 		len = snprintf(message, sizeof message, "%s %x %s %s\n",  irmp_fulldata, repeat, irmp_fulldata, remote_name);
